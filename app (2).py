@@ -1,7 +1,6 @@
 
 import streamlit as st
 import pickle
-import os
 
 # ---------------- PAGE CONFIG ----------------
 st.set_page_config(
@@ -27,12 +26,11 @@ try:
     tfidf, model = load_model()
 except Exception as e:
     st.error("⚠️ Could not load the ML model or vectorizer.")
-    st.write("Make sure these files exist in your GitHub repository:")
     st.code("app.py\nmodel.pkl\nvectorizer")
     st.stop()
 
 
-# ---------------- SAMPLE MESSAGES ----------------
+# ---------------- SAMPLE CALLBACK ----------------
 def set_sample(sample):
     st.session_state.message = sample
 
@@ -132,6 +130,28 @@ div[data-testid="stMetric"] {
     border-radius: 14px;
 }
 
+.confidence-card {
+    background: linear-gradient(135deg, #172554, #17243b);
+    border: 1px solid #3b82f6;
+    border-radius: 18px;
+    padding: 28px;
+    text-align: center;
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+
+.confidence-number {
+    font-size: 52px;
+    font-weight: 800;
+    color: #60a5fa;
+    margin: 5px 0;
+}
+
+.confidence-label {
+    color: #cbd5e1;
+    font-size: 17px;
+}
+
 .footer {
     text-align: center;
     color: #94a3b8;
@@ -160,7 +180,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Initialize input state
 if "message" not in st.session_state:
     st.session_state.message = ""
 
@@ -178,7 +197,6 @@ st.markdown("""
     in the input box.
 </div>
 """, unsafe_allow_html=True)
-
 
 col1, col2 = st.columns(2)
 
@@ -240,20 +258,17 @@ if st.button(
 
     else:
         try:
-            # Convert text into TF-IDF features
             transformed_message = tfidf.transform([message])
 
-            # Predict using trained ML model
             prediction = model.predict(transformed_message)[0]
 
-            # Determine spam or ham
             prediction_text = str(prediction).strip().lower()
 
             is_spam = prediction_text in [
                 "spam", "1", "true", "yes"
             ]
 
-            # Get confidence if supported
+            # ---------------- CONFIDENCE ----------------
             confidence = None
 
             if hasattr(model, "predict_proba"):
@@ -263,8 +278,15 @@ if st.button(
 
                 confidence = max(probabilities) * 100
 
-            # Display result
+            elif hasattr(model, "decision_function"):
+                st.info(
+                    "This model does not provide probability estimates. "
+                    "Confidence percentage is unavailable."
+                )
+
+            # ---------------- RESULT ----------------
             st.markdown("---")
+
             st.markdown(
                 '<div class="section-title">📊 Analysis Result</div>',
                 unsafe_allow_html=True
@@ -297,17 +319,32 @@ if st.button(
                 </div>
                 """, unsafe_allow_html=True)
 
-            # Confidence display
+            # ---------------- CONFIDENCE DISPLAY ----------------
             if confidence is not None:
-                st.metric(
-                    label="🎯 Prediction Confidence",
-                    value=f"{confidence:.2f}%"
+
+                st.markdown(f"""
+                <div class="confidence-card">
+                    <div class="confidence-label">
+                        🎯 MODEL PREDICTION CONFIDENCE
+                    </div>
+                    <div class="confidence-number">
+                        {confidence:.2f}%
+                    </div>
+                    <div class="confidence-label">
+                        Confidence in predicted class
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                st.progress(int(confidence))
+
+            else:
+                st.warning(
+                    "Prediction confidence is unavailable for this model."
                 )
 
-                st.progress(confidence / 100)
-
             st.caption(
-                "Prediction generated using your trained Machine Learning model."
+                "Note: Prediction confidence is not the same as model accuracy."
             )
 
         except Exception as e:
