@@ -1,0 +1,4 @@
+gradio>=5.0,<7.0
+scikit-learn
+numpy
+scipy
